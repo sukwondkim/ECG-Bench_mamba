@@ -47,6 +47,8 @@ class BuildEncoder:
             return self.build_mlae()
         elif self.args.encoder == "st_mem":
             return self.build_st_mem()
+        elif self.args.encoder == "mamba":
+            return self.build_mamba_encoder()
         else:
             raise ValueError(f"{self.args.encoder} not supported.")
 
@@ -103,6 +105,34 @@ class BuildEncoder:
             mlae_vit_base_dec256d4b(device=self.device, num_leads=12, seq_len=self.args.segment_len, patch_size=1),
             num_encoder_tokens=self.args.num_encoder_tokens,
         )
+        return {"encoder": ecg_encoder}
+
+    def build_mamba_encoder(self):
+        if self.args.encoder and self.args.llm:
+            from ecg_bench.elms.ecg_encoder.mamba import MambaFinetune
+            ecg_encoder = MambaFinetune(
+                d_model=ECG_ENCODERS[self.args.encoder]["model_hidden_size"],
+                d_state=16,
+                expand=2,
+                num_leads=12,
+                num_encoder_tokens=self.args.num_encoder_tokens,
+            ).to(self.device)
+        else:
+            from ecg_bench.elms.ecg_encoder.mamba import MambaPretrain
+            lm = AutoModel.from_pretrained(
+                ECG_ENCODERS[self.args.encoder]["tokenizer"],
+                cache_dir=HF_CACHE_DIR
+            )
+            ecg_encoder = MambaPretrain(
+                lm=lm,
+                distributed=self.args.distributed,
+                d_model=ECG_ENCODERS[self.args.encoder]["model_hidden_size"],
+                d_state=16,
+                expand=2,
+                seq_len=self.args.segment_len,
+                num_leads=12,
+            ).to(self.device)
+    
         return {"encoder": ecg_encoder}
 
     def build_projection(
