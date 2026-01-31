@@ -114,6 +114,33 @@ All installations and experiments were completed on Ubuntu 20.04.5 LTS with NVID
 
 13. Another consideration is that we use ***gated*** models (e.g., Llama 3.2, Gemma) from HuggingFace, therefore you will need to get an api key and export the environment variable `export HF_TOKEN=$API_KEY`.
 
+14. (Optional) In order to train with `mamba-ssm`, you need to install `mamba-ssm` and `causal-conv1d` while avoiding ABI mismatch errors. This requires installing CUDA toolkit in the conda environment and downgrading PyTorch version to 2.4.0.
+
+```bash
+# Install CUDA toolkit 12.4 in conda environment
+conda install -c nvidia/label/cuda-12.4.0 cuda-toolkit
+
+# Verify nvcc is using the correct version
+nvcc --version
+# Should show CUDA 12.4
+
+# Downgrade PyTorch to 2.4.0
+pip uninstall torch torchvision
+pip cache purge
+pip install torch==2.4.0 torchvision==0.19.0 --index-url https://download.pytorch.org/whl/cu124
+
+# Install causal-conv1d from source
+CAUSAL_CONV1D_FORCE_BUILD=TRUE pip install causal-conv1d \
+    --no-binary causal-conv1d \
+    --no-build-isolation
+
+# Install mamba-ssm from source
+MAMBA_FORCE_BUILD=TRUE pip install mamba-ssm \
+    --no-binary mamba-ssm \
+    --no-build-isolation
+```
+
+
 **NOTE: The working directory is the root (`ECG-Bench`) directory of the repository.**
 
 ## ECG Datasets <a name="data"></a>
