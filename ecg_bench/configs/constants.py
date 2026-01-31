@@ -225,6 +225,14 @@ ECG_ENCODERS = {
         "projection_dim": None,
         "encoder_input_len": None,
     },
+    "mamba": {
+        "tokenizer": "ncbi/MedCPT-Query-Encoder",
+        "encoder_input_len": 512,
+        "find_unused_parameters": False,
+        "strict": False,
+        "model_hidden_size": 512,
+        "projection_dim": 512,
+    },
 }
 
 
