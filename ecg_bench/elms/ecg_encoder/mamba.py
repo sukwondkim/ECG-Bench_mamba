@@ -33,7 +33,7 @@ class MambaPretrain(nn.Module):
         
         # Simple decoder for MAE-style reconstruction
         self.decoder_blocks = nn.ModuleList([
-            Mamba(d_model=d_model, d_state=16, d_conv=4, expand=2) 
+            Mamba(d_model=d_model, d_state=d_state, d_conv=4, expand=2) 
             for _ in range(1)
         ])
         self.decoder_layer_norms = nn.LayerNorm(d_model)
@@ -43,6 +43,9 @@ class MambaPretrain(nn.Module):
         """
         Block-wise masking: Mask blocks to prevent linear interpolation
         
+        Note: When seq_len is not divisible by block_size, the remaining timesteps
+        at the end are not masked.
+
         Args:
             x: [B, seq_len, num_leads] - original ECG signals (before projection)
             mask_ratio: ratio of timesteps to mask
@@ -61,35 +64,25 @@ class MambaPretrain(nn.Module):
         # Create mask at block level
         mask = torch.zeros(B, L, device=x.device)
         
-        # Randomly select blocks to mask
-        for b in range(B):
-            block_indices = torch.randperm(num_blocks, device=x.device)[:num_masked_blocks]
-            for block_idx in block_indices:
-                start = block_idx * block_size
-                end = min(start + block_size, L)
-                mask[b, start:end] = 1
+        if num_blocks > 0 and num_masked_blocks > 0:
+            # Randomly select blocks to mask
+            block_noise = torch.rand(B, num_blocks, device=x.device)
+            block_indices = torch.argsort(block_noise, dim=1)
+            
+            masked_block_indices = block_indices[:, :num_masked_blocks]  # [B, num_masked_blocks]
+
+            masked_token_indices = masked_block_indices.unsqueeze(-1) * block_size + torch.arange(block_size, device=x.device).view(1, 1, -1)
+            masked_token_indices = masked_token_indices.reshape(B, -1)  # [B, num_masked_blocks * block_size]
+            mask.scatter_(1, masked_token_indices, 1)
+            
+        len_keep = L - (num_masked_blocks * block_size)
         
-        # Get indices of visible (unmasked) tokens
-        ids_keep_list = []
-        for b in range(B):
-            visible_indices = torch.where(mask[b] == 0)[0]
-            ids_keep_list.append(visible_indices)
-        
-        # All samples should have same length with block-wise masking
-        # If not (due to rounding), we take the minimum length
-        min_len = min(len(idx) for idx in ids_keep_list)
-        ids_keep = torch.stack([idx[:min_len] for idx in ids_keep_list], dim=0)  # [B, len_keep]
-        
-        # Extract visible tokens
+        sort_key = mask * (L + 1) + torch.arange(L, device=x.device).unsqueeze(0)
+        ids_shuffle = torch.argsort(sort_key, dim=1)
+        ids_keep = ids_shuffle[:, :len_keep]  # [B, len_keep]
         x_masked = torch.gather(x, dim=1, index=ids_keep.unsqueeze(-1).expand(-1, -1, D))
-        
-        # Create ids_restore for reconstruction
-        # Use dynamic scaling to ensure order is preserved regardless of sequence length
-        ids_restore = torch.argsort(torch.argsort(
-            mask + torch.arange(L, device=x.device).unsqueeze(0) / (L + 1), 
-            dim=1
-        ), dim=1)
-        
+        ids_restore = torch.argsort(ids_shuffle, dim=1)
+
         return x_masked, mask, ids_restore
     
     def random_masking(self, x, mask_ratio):

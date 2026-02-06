@@ -72,11 +72,11 @@ class GPUSetup:
         
         # Ensure the current CUDA device context matches the target device
         if device.type == 'cuda':
-             # If index is set (e.g. "cuda:6"), we must safeguard against context mismatch for Triton/Mamba2
-             if device.index is not None:
-                 torch.cuda.set_device(device.index)
-             else:
-                 torch.cuda.set_device(torch.cuda.current_device())
+            # If index is set (e.g. "cuda:6"), we must safeguard against context mismatch for Triton/Mamba2
+            if device.index is not None:
+                torch.cuda.set_device(device.index)
+            else:
+                torch.cuda.set_device(torch.cuda.current_device())
 
         model = model.to(device)
         if getattr(self.args, "distributed", False):
