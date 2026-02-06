@@ -69,6 +69,15 @@ class GPUSetup:
 
     def setup_gpu(self, model: torch.nn.Module, find_unused_parameters) -> torch.nn.Module:
         device = self.get_device()
+        
+        # Ensure the current CUDA device context matches the target device
+        if device.type == 'cuda':
+            # If index is set (e.g. "cuda:6"), we must safeguard against context mismatch for Triton/Mamba2
+            if device.index is not None:
+                torch.cuda.set_device(device.index)
+            else:
+                torch.cuda.set_device(torch.cuda.current_device())
+
         model = model.to(device)
         if getattr(self.args, "distributed", False):
             model = DDP(model, device_ids=[device.index], output_device=device.index, find_unused_parameters=find_unused_parameters)

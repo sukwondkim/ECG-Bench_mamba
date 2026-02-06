@@ -148,6 +148,8 @@ class BuildDataLoader:
             return {"encoder_tokenizer": None}
         elif self.args.encoder == "merl":
             return {"encoder_tokenizer": AutoTokenizer.from_pretrained(ECG_ENCODERS[self.args.encoder]["tokenizer"], cache_dir=HF_CACHE_DIR)}
+        elif self.args.encoder == "mamba":
+            return {"encoder_tokenizer": AutoTokenizer.from_pretrained(ECG_ENCODERS[self.args.encoder]["tokenizer"], cache_dir=HF_CACHE_DIR)}
         elif self.args.encoder in VISION_ENCODERS:
             return {"encoder_tokenizer": AutoProcessor.from_pretrained(VISION_ENCODERS[self.args.encoder]["tokenizer"], cache_dir=HF_CACHE_DIR)}
 
